@@ -4,6 +4,7 @@ struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
     @StateObject private var detector = YOLODetector(variant: AppSettings.shared.yoloVariant)
     @StateObject private var estimator = DepthEstimator(variant: AppSettings.shared.depthVariant)
+    @StateObject private var segEstimator = SegmentationEstimator(variant: AppSettings.shared.segmentationVariant)
 
     var body: some View {
         NavigationView {
@@ -97,6 +98,37 @@ struct SettingsView: View {
                     Text("深度推定モデル選択")
                 }
 
+                // Segmentation Model Selection
+                Section {
+                    ForEach(SegmentationModelVariant.allCases) { variant in
+                        Button {
+                            settings.selectedSegmentationModel = variant.rawValue
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(variant.displayName)
+                                        .foregroundColor(.primary)
+                                    Text(variant.description)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if settings.selectedSegmentationModel == variant.rawValue {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.accentColor)
+                                }
+                                modelAvailabilityBadge(
+                                    isAvailable: variant.isAvailable
+                                )
+                            }
+                        }
+                    }
+                } header: {
+                    Text("セグメンテーションモデル選択")
+                } footer: {
+                    Text("DeepLabV3 (PASCAL VOC 21クラス) によるセマンティックセグメンテーション")
+                }
+
                 // Model Status
                 Section {
                     HStack {
@@ -109,6 +141,12 @@ struct SettingsView: View {
                         Label(settings.depthVariant.displayName, systemImage: "cpu")
                         Spacer()
                         modelStatusBadge(isLoaded: estimator.isModelLoaded)
+                    }
+
+                    HStack {
+                        Label(settings.segmentationVariant.displayName, systemImage: "cpu")
+                        Spacer()
+                        modelStatusBadge(isLoaded: segEstimator.isModelLoaded)
                     }
                 } header: {
                     Text("モデル状態")
@@ -132,13 +170,13 @@ struct SettingsView: View {
                     HStack {
                         Text("バージョン")
                         Spacer()
-                        Text("1.1.0")
+                        Text("1.2.0")
                             .foregroundColor(.secondary)
                     }
                     HStack {
                         Text("対応モデル")
                         Spacer()
-                        Text("YOLOv8 (n/s/m/x), Depth Anything V2")
+                        Text("YOLOv8, Depth Anything V2, DeepLabV3")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -152,6 +190,9 @@ struct SettingsView: View {
             }
             .onChange(of: settings.selectedDepthModel) { _ in
                 estimator.switchModel(to: settings.depthVariant)
+            }
+            .onChange(of: settings.selectedSegmentationModel) { _ in
+                segEstimator.switchModel(to: settings.segmentationVariant)
             }
         }
     }
@@ -196,6 +237,12 @@ struct SettingsView: View {
                     icon: "cube.fill",
                     title: "深度推定",
                     description: "Depth Anything V2 を使用して撮影した写真の深度マップを生成します。処理に時間がかかる場合があります。"
+                )
+
+                guideSection(
+                    icon: "square.on.square.dashed",
+                    title: "セグメンテーション",
+                    description: "DeepLabV3 を使用してピクセル単位でシーンを分類します。21カテゴリ（人、車、動物等）に対応。"
                 )
 
                 guideSection(
