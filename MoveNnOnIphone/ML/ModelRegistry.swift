@@ -39,6 +39,8 @@ enum YOLOVariant: String, CaseIterable, Identifiable, Codable {
 
 enum DepthModelVariant: String, CaseIterable, Identifiable, Codable {
     case smallF16 = "DepthAnythingV2SmallF16"
+    case baseF16 = "DepthAnythingV2BaseF16"
+    case largeF16 = "DepthAnythingV2LargeF16"
 
     var id: String { rawValue }
 
@@ -47,12 +49,16 @@ enum DepthModelVariant: String, CaseIterable, Identifiable, Codable {
     var displayName: String {
         switch self {
         case .smallF16: return "Depth Anything V2 Small (F16)"
+        case .baseF16: return "Depth Anything V2 Base (F16)"
+        case .largeF16: return "Depth Anything V2 Large (F16)"
         }
     }
 
     var description: String {
         switch self {
-        case .smallF16: return "軽量・高速な深度推定モデル"
+        case .smallF16: return "軽量・高速。約100MB"
+        case .baseF16: return "バランス型。約200MB"
+        case .largeF16: return "最高精度。約600MB"
         }
     }
 

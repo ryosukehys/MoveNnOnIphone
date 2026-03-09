@@ -12,8 +12,10 @@ YOLOv8, Depth Anything V2, DeepLabV3 を CoreML 形式で準備します。
     python convert_models.py                       # デフォルト: 全モデル変換
     python convert_models.py --yolo-variant yolov8s  # 特定のYOLOバリアント
     python convert_models.py --all-yolo            # 全YOLOバリアントを変換
-    python convert_models.py --skip-depth          # 深度モデルをスキップ
-    python convert_models.py --skip-segmentation   # セグメンテーションをスキップ
+    python convert_models.py --depth-variant base   # Base サイズの深度モデル
+    python convert_models.py --all-depth            # 全深度モデルバリアント変換
+    python convert_models.py --skip-depth           # 深度モデルをスキップ
+    python convert_models.py --skip-segmentation    # セグメンテーションをスキップ
 """
 
 import argparse
@@ -39,6 +41,25 @@ YOLO_VARIANTS = {
     "yolov8s": {"pt": "yolov8s.pt", "description": "Small - バランス型"},
     "yolov8m": {"pt": "yolov8m.pt", "description": "Medium - 高精度"},
     "yolov8x": {"pt": "yolov8x.pt", "description": "Extra Large - 最高精度"},
+}
+
+# Depth Anything V2 バリアント
+DEPTH_VARIANTS = {
+    "small": {
+        "hf_name": "depth-anything/Depth-Anything-V2-Small-hf",
+        "output_name": "DepthAnythingV2SmallF16",
+        "description": "Small - 軽量・高速",
+    },
+    "base": {
+        "hf_name": "depth-anything/Depth-Anything-V2-Base-hf",
+        "output_name": "DepthAnythingV2BaseF16",
+        "description": "Base - バランス型",
+    },
+    "large": {
+        "hf_name": "depth-anything/Depth-Anything-V2-Large-hf",
+        "output_name": "DepthAnythingV2LargeF16",
+        "description": "Large - 最高精度",
+    },
 }
 
 # Apple公式 DeepLabV3 モデル
@@ -152,11 +173,17 @@ def convert_yolov8(variant="yolov8n"):
         return False
 
 
-def convert_depth_anything():
-    """Depth Anything V2 Small を CoreML 形式に変換"""
+def convert_depth_anything(variant="small"):
+    """Depth Anything V2 を CoreML 形式に変換"""
+    if variant not in DEPTH_VARIANTS:
+        print(f"Error: 不明なバリアント '{variant}'")
+        print(f"利用可能: {', '.join(DEPTH_VARIANTS.keys())}")
+        return False
+
+    info = DEPTH_VARIANTS[variant]
     print()
     print("=" * 50)
-    print("Depth Anything V2 Small の CoreML 変換を開始")
+    print(f"Depth Anything V2 {variant.capitalize()} ({info['description']}) の CoreML 変換を開始")
     print("=" * 50)
 
     try:
@@ -168,7 +195,7 @@ def convert_depth_anything():
         print("  pip install torch coremltools transformers")
         return False
 
-    model_name = "depth-anything/Depth-Anything-V2-Small-hf"
+    model_name = info["hf_name"]
     print(f"モデルをダウンロード中: {model_name}")
 
     processor = AutoImageProcessor.from_pretrained(model_name)
@@ -223,7 +250,7 @@ def convert_depth_anything():
     )
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    output_path = os.path.join(OUTPUT_DIR, "DepthAnythingV2SmallF16.mlpackage")
+    output_path = os.path.join(OUTPUT_DIR, f"{info['output_name']}.mlpackage")
     mlmodel.save(output_path)
     print(f"モデルを保存しました: {output_path}")
     return True
@@ -275,6 +302,17 @@ def parse_args():
         "--all-yolo",
         action="store_true",
         help="全YOLOバリアントを変換",
+    )
+    parser.add_argument(
+        "--depth-variant",
+        choices=list(DEPTH_VARIANTS.keys()),
+        default="small",
+        help="変換するDepth Anythingバリアント (default: small)",
+    )
+    parser.add_argument(
+        "--all-depth",
+        action="store_true",
+        help="全Depth Anythingバリアントを変換",
     )
     parser.add_argument(
         "--deeplabv3-variant",
@@ -329,7 +367,12 @@ def main():
 
     # Depth conversion
     if not args.skip_depth:
-        results["Depth Anything V2"] = convert_depth_anything()
+        if args.all_depth:
+            for dv in DEPTH_VARIANTS:
+                results[f"Depth Anything V2 ({dv})"] = convert_depth_anything(dv)
+        else:
+            dv = args.depth_variant
+            results[f"Depth Anything V2 ({dv})"] = convert_depth_anything(dv)
 
     # DeepLabV3 download
     if not args.skip_segmentation:
