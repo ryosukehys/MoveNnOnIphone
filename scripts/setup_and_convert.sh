@@ -5,13 +5,26 @@ set -euo pipefail
 # CoreML モデル変換セットアップスクリプト
 #
 # 使い方:
-#   bash scripts/setup_and_convert.sh              # デフォルト venv (./venv)
+#   bash scripts/setup_and_convert.sh              # デフォルト (yolov8n + depth)
 #   bash scripts/setup_and_convert.sh /path/to/venv # 既存の venv を指定
+#   bash scripts/setup_and_convert.sh --all-yolo   # 全YOLOバリアント変換
+#   bash scripts/setup_and_convert.sh --yolo-variant yolov8s  # 特定バリアント
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-VENV_PATH="${1:-$PROJECT_DIR/venv}"
+
+# 最初の引数が / or . で始まる場合は venv パスとして扱う
+VENV_PATH="$PROJECT_DIR/venv"
+CONVERT_ARGS=()
+
+for arg in "$@"; do
+    if [[ "$arg" == /* ]] || [[ "$arg" == ./* ]] || [[ "$arg" == ../* ]]; then
+        VENV_PATH="$arg"
+    else
+        CONVERT_ARGS+=("$arg")
+    fi
+done
 
 log()  { echo "[INFO]  $1"; }
 warn() { echo "[WARN]  $1"; }
@@ -71,7 +84,7 @@ for pkg in ['torch', 'coremltools', 'ultralytics', 'transformers']:
 echo ""
 log "CoreML モデル変換を開始..."
 echo ""
-python3 "$SCRIPT_DIR/convert_models.py"
+python3 "$SCRIPT_DIR/convert_models.py" "${CONVERT_ARGS[@]}"
 
 # --- Step 8: 完了 ---
 echo ""
@@ -83,6 +96,10 @@ log "モデルファイルの場所:"
 log "  $PROJECT_DIR/MoveNnOnIphone/MLModels/"
 echo ""
 log "次のステップ:"
-log "  1. Xcode でプロジェクトを開く"
-log "  2. MLModels/ 内のモデルファイルをプロジェクトにドラッグ＆ドロップ"
+log "  1. xcodegen generate でプロジェクト生成"
+log "  2. Xcode でプロジェクトを開く"
 log "  3. ビルドして iPhone 実機で実行"
+echo ""
+log "追加のYOLOバリアントを変換するには:"
+log "  bash scripts/setup_and_convert.sh --yolo-variant yolov8s"
+log "  bash scripts/setup_and_convert.sh --all-yolo"

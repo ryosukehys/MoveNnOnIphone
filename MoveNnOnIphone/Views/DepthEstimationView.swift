@@ -2,7 +2,8 @@ import SwiftUI
 
 struct DepthEstimationView: View {
     @StateObject private var cameraManager = CameraManager()
-    @StateObject private var estimator = DepthEstimator()
+    @StateObject private var estimator = DepthEstimator(variant: AppSettings.shared.depthVariant)
+    @ObservedObject private var settings = AppSettings.shared
 
     @State private var capturedImage: UIImage?
     @State private var depthImage: UIImage?
@@ -24,6 +25,9 @@ struct DepthEstimationView: View {
         }
         .onDisappear {
             cameraManager.stop()
+        }
+        .onChange(of: settings.selectedDepthModel) { _ in
+            estimator.switchModel(to: settings.depthVariant)
         }
     }
 
@@ -110,11 +114,14 @@ struct DepthEstimationView: View {
 
                 // Image display
                 if let capturedImage, let depthImage {
-                    ZStack {
+                    ZStack(alignment: .bottom) {
                         if showDepthMap {
                             Image(uiImage: depthImage)
                                 .resizable()
                                 .scaledToFit()
+                            DepthColorBar()
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 8)
                         } else {
                             Image(uiImage: capturedImage)
                                 .resizable()

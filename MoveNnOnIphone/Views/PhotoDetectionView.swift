@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PhotoDetectionView: View {
     @StateObject private var cameraManager = CameraManager()
-    @StateObject private var detector = YOLODetector()
+    @StateObject private var detector = YOLODetector(variant: AppSettings.shared.yoloVariant)
     @ObservedObject private var settings = AppSettings.shared
 
     @State private var capturedImage: UIImage?
@@ -24,6 +24,9 @@ struct PhotoDetectionView: View {
         }
         .onDisappear {
             cameraManager.stop()
+        }
+        .onChange(of: settings.selectedYOLOVariant) { _ in
+            detector.switchModel(to: settings.yoloVariant)
         }
     }
 
