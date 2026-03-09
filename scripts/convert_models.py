@@ -153,8 +153,23 @@ def convert_depth_anything():
 
     wrapper = DepthWrapper(model)
 
-    print("モデルをトレース中...")
-    traced = torch.jit.trace(wrapper, dummy_input)
+    # coremltools は upsample_bicubic2d をサポートしていないため、
+    # トレース中のみ bicubic → bilinear に置換する
+    import torch.nn.functional as F
+    _original_interpolate = F.interpolate
+
+    def _patched_interpolate(*args, **kwargs):
+        if kwargs.get("mode") == "bicubic":
+            kwargs["mode"] = "bilinear"
+            kwargs.pop("antialias", None)
+        return _original_interpolate(*args, **kwargs)
+
+    print("モデルをトレース中 (bicubic → bilinear 置換)...")
+    F.interpolate = _patched_interpolate
+    try:
+        traced = torch.jit.trace(wrapper, dummy_input)
+    finally:
+        F.interpolate = _original_interpolate
 
     print("CoreML に変換中...")
     mlmodel = ct.convert(
