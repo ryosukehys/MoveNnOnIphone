@@ -31,23 +31,44 @@ iPhoneのカメラを使用した AI ビジョンアプリ。YOLOv8 によるリ
 ### 必要環境
 - macOS 14.0+
 - Xcode 15.0+
+- Python 3.8+
 - iOS 17.0+ の iPhone 実機（シミュレータではカメラ使用不可）
 
 ### 手順
 
 #### 1. CoreML モデルの準備
 
-##### 方法 A: 変換スクリプトを使用
+##### 方法 A: セットアップスクリプトを使用（推奨）
+
+Python 仮想環境の作成、依存ライブラリのインストール、モデル変換を一括で実行します。
 
 ```bash
-# 必要なライブラリをインストール
-pip install ultralytics coremltools torch transformers
+# デフォルトの仮想環境 (./venv) で一括セットアップ
+bash scripts/setup_and_convert.sh
+```
+
+既存の仮想環境を使用する場合:
+```bash
+bash scripts/setup_and_convert.sh /path/to/your/venv
+```
+
+> **注意**: 初回は `torch` (約800MB) 等のダウンロードに時間がかかります。
+
+##### 方法 B: 手動で仮想環境をセットアップ
+
+```bash
+# 仮想環境を作成・有効化
+python3 -m venv venv
+source venv/bin/activate
+
+# 依存ライブラリをインストール
+pip install -r scripts/requirements.txt
 
 # モデルを変換
 python scripts/convert_models.py
 ```
 
-##### 方法 B: 手動でモデルを取得
+##### 方法 C: 個別にモデルを取得
 
 **YOLOv8n:**
 ```bash
@@ -58,6 +79,8 @@ yolo export model=yolov8n.pt format=coreml nms=True imgsz=640
 **Depth Anything V2:**
 - [Hugging Face](https://huggingface.co/depth-anything/Depth-Anything-V2-Small-hf) からモデルを取得
 - `coremltools` で CoreML 形式に変換
+
+> **重要**: `torch >= 2.1.0` が必要です。古いバージョンでは coremltools が PyTorch を無効化し、変換が失敗します。
 
 #### 2. Xcode プロジェクトの生成
 
@@ -124,7 +147,9 @@ MoveNnOnIphone/
 │   ├── Assets.xcassets/
 │   └── Info.plist
 ├── scripts/
-│   └── convert_models.py           # モデル変換スクリプト
+│   ├── setup_and_convert.sh        # 一括セットアップスクリプト
+│   ├── convert_models.py           # モデル変換スクリプト
+│   └── requirements.txt            # Python 依存ライブラリ
 └── README.md
 ```
 
