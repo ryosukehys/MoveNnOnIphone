@@ -31,7 +31,9 @@ struct RealTimeDetectionView: View {
             VStack {
                 hudView
                 Spacer()
-                if !detector.isModelLoaded {
+                if detector.isLoading {
+                    loadingBanner
+                } else if !detector.isModelLoaded {
                     modelNotLoadedBanner
                 }
             }
@@ -39,11 +41,13 @@ struct RealTimeDetectionView: View {
         }
         .onAppear {
             cameraManager.checkPermission()
+            detector.prepareIfNeeded()
             setupFrameProcessing()
             cameraManager.start()
         }
         .onDisappear {
             cameraManager.stop()
+            detector.unloadModel()
         }
         .onChange(of: settings.selectedYOLOVariant) { _ in
             detector.switchModel(to: settings.yoloVariant)
@@ -68,6 +72,22 @@ struct RealTimeDetectionView: View {
 
             Spacer()
         }
+    }
+
+    // MARK: - Loading Banner
+
+    private var loadingBanner: some View {
+        VStack(spacing: 8) {
+            ProgressView()
+                .tint(.white)
+                .scaleEffect(1.3)
+            Text("モデル読み込み中...")
+                .font(.headline)
+                .foregroundColor(.white)
+        }
+        .padding()
+        .background(.black.opacity(0.7))
+        .cornerRadius(12)
     }
 
     // MARK: - Model Not Loaded

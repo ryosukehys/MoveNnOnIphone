@@ -5,6 +5,8 @@ import UIKit
 final class SegmentationEstimator: ObservableObject {
     private var model: VNCoreMLModel?
     @Published var isModelLoaded = false
+    @Published var isLoading = false
+    @Published var loadError: String?
     private(set) var currentVariant: SegmentationModelVariant
 
     // PASCAL VOC 21 classes
@@ -42,7 +44,19 @@ final class SegmentationEstimator: ObservableObject {
 
     init(variant: SegmentationModelVariant = .deeplabV3FP16) {
         currentVariant = variant
+    }
+
+    func prepareIfNeeded() {
+        guard model == nil, !isLoading else { return }
         loadModel()
+    }
+
+    func unloadModel() {
+        model = nil
+        DispatchQueue.main.async {
+            self.isModelLoaded = false
+        }
+        print("[SegmentationEstimator] Model unloaded to free memory")
     }
 
     func switchModel(to variant: SegmentationModelVariant) {
@@ -51,6 +65,7 @@ final class SegmentationEstimator: ObservableObject {
         model = nil
         DispatchQueue.main.async {
             self.isModelLoaded = false
+            self.loadError = nil
         }
         loadModel()
     }
@@ -60,20 +75,38 @@ final class SegmentationEstimator: ObservableObject {
             fileName: currentVariant.modelFileName
         ) else {
             print("[SegmentationEstimator] \(currentVariant.modelFileName).mlmodelc not found")
+            DispatchQueue.main.async {
+                self.loadError = "モデルファイルが見つかりません"
+            }
             return
         }
 
-        do {
-            let config = MLModelConfiguration()
-            config.computeUnits = .cpuAndNeuralEngine
-            let mlModel = try MLModel(contentsOf: modelURL, configuration: config)
-            model = try VNCoreMLModel(for: mlModel)
-            DispatchQueue.main.async {
-                self.isModelLoaded = true
+        DispatchQueue.main.async {
+            self.isLoading = true
+            self.loadError = nil
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+
+            do {
+                let config = MLModelConfiguration()
+                config.computeUnits = .cpuAndNeuralEngine
+                let mlModel = try MLModel(contentsOf: modelURL, configuration: config)
+                let vncoreModel = try VNCoreMLModel(for: mlModel)
+                DispatchQueue.main.async {
+                    self.model = vncoreModel
+                    self.isModelLoaded = true
+                    self.isLoading = false
+                }
+                print("[SegmentationEstimator] Model loaded successfully: \(self.currentVariant.displayName)")
+            } catch {
+                print("[SegmentationEstimator] Failed to load model: \(error)")
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.loadError = "モデルの読み込みに失敗: \(error.localizedDescription)"
+                }
             }
-            print("[SegmentationEstimator] Model loaded successfully")
-        } catch {
-            print("[SegmentationEstimator] Failed to load model: \(error)")
         }
     }
 
