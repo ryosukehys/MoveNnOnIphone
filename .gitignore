@@ -27,6 +27,9 @@ Packages/
 # CocoaPods
 Pods/
 
+# Python virtual environment
+venv/
+
 # Temporary files
 *.pyc
 __pycache__/

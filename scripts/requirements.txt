@@ -1,0 +1,5 @@
+torch>=2.1.0
+coremltools>=7.0
+ultralytics>=8.0.0
+transformers>=4.35.0
+packaging>=20.0
