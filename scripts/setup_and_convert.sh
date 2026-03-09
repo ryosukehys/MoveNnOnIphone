@@ -5,10 +5,10 @@ set -euo pipefail
 # CoreML モデル変換セットアップスクリプト
 #
 # 使い方:
-#   bash scripts/setup_and_convert.sh              # デフォルト (yolov8n + depth)
+#   bash scripts/setup_and_convert.sh              # デフォルト (全モデル変換)
 #   bash scripts/setup_and_convert.sh /path/to/venv # 既存の venv を指定
 #   bash scripts/setup_and_convert.sh --all-yolo   # 全YOLOバリアント変換
-#   bash scripts/setup_and_convert.sh --yolo-variant yolov8s  # 特定バリアント
+#   bash scripts/setup_and_convert.sh --skip-segmentation  # セグメンテーションをスキップ
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -100,6 +100,9 @@ log "  1. xcodegen generate でプロジェクト生成"
 log "  2. Xcode でプロジェクトを開く"
 log "  3. ビルドして iPhone 実機で実行"
 echo ""
-log "追加のYOLOバリアントを変換するには:"
-log "  bash scripts/setup_and_convert.sh --yolo-variant yolov8s"
-log "  bash scripts/setup_and_convert.sh --all-yolo"
+log "オプション:"
+log "  --all-yolo           全YOLOバリアント変換"
+log "  --all-deeplabv3      全DeepLabV3バリアントDL"
+log "  --skip-yolo          YOLO変換をスキップ"
+log "  --skip-depth         深度モデルをスキップ"
+log "  --skip-segmentation  セグメンテーションをスキップ"

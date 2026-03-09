@@ -2,24 +2,26 @@
 """
 CoreMLモデル変換スクリプト
 
-YOLOv8 と Depth Anything V2 を CoreML 形式に変換します。
+YOLOv8, Depth Anything V2, DeepLabV3 を CoreML 形式で準備します。
 
 必要なライブラリ:
     pip install -r scripts/requirements.txt
 
 使い方:
-    bash scripts/setup_and_convert.sh          # 推奨（venv自動作成）
-    bash scripts/setup_and_convert.sh /path/to/venv  # 既存venv指定
-    python convert_models.py                   # 手動実行（デフォルト: yolov8n + depth）
+    bash scripts/setup_and_convert.sh              # 推奨（全モデル変換）
+    python convert_models.py                       # デフォルト: 全モデル変換
     python convert_models.py --yolo-variant yolov8s  # 特定のYOLOバリアント
-    python convert_models.py --all-yolo        # 全YOLOバリアントを変換
-    python convert_models.py --skip-depth      # 深度モデルをスキップ
+    python convert_models.py --all-yolo            # 全YOLOバリアントを変換
+    python convert_models.py --skip-depth          # 深度モデルをスキップ
+    python convert_models.py --skip-segmentation   # セグメンテーションをスキップ
 """
 
 import argparse
 import os
 import sys
 import importlib.metadata
+import urllib.request
+import shutil
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "MoveNnOnIphone", "MLModels")
 
@@ -39,6 +41,22 @@ YOLO_VARIANTS = {
     "yolov8x": {"pt": "yolov8x.pt", "description": "Extra Large - 最高精度"},
 }
 
+# Apple公式 DeepLabV3 モデル
+DEEPLABV3_MODELS = {
+    "DeepLabV3": {
+        "url": "https://ml-assets.apple.com/coreml/models/Image/ImageSegmentation/DeepLabV3/DeepLabV3.mlmodel",
+        "description": "Full precision (8.6MB)",
+    },
+    "DeepLabV3FP16": {
+        "url": "https://ml-assets.apple.com/coreml/models/Image/ImageSegmentation/DeepLabV3/DeepLabV3FP16.mlmodel",
+        "description": "FP16 (4.3MB)",
+    },
+    "DeepLabV3Int8LUT": {
+        "url": "https://ml-assets.apple.com/coreml/models/Image/ImageSegmentation/DeepLabV3/DeepLabV3Int8LUT.mlmodel",
+        "description": "Int8 quantized (2.3MB)",
+    },
+}
+
 
 def _parse_version(ver_str):
     """バージョン文字列をタプルに変換 (packaging が無い場合のフォールバック)"""
@@ -53,7 +71,6 @@ def _parse_version(ver_str):
 
 def check_dependencies():
     """依存ライブラリのバージョンを確認し、不足があればエラー終了"""
-    # packaging モジュールを試行、無ければタプル比較にフォールバック
     try:
         from packaging.version import Version
 
@@ -126,7 +143,6 @@ def convert_yolov8(variant="yolov8n"):
     if os.path.exists(src):
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         if os.path.exists(dst):
-            import shutil
             shutil.rmtree(dst)
         os.rename(src, dst)
         print(f"モデルを保存しました: {dst}")
@@ -213,6 +229,38 @@ def convert_depth_anything():
     return True
 
 
+def download_deeplabv3(variant="DeepLabV3FP16"):
+    """Apple公式 DeepLabV3 モデルをダウンロード"""
+    if variant not in DEEPLABV3_MODELS:
+        print(f"Error: 不明なバリアント '{variant}'")
+        print(f"利用可能: {', '.join(DEEPLABV3_MODELS.keys())}")
+        return False
+
+    info = DEEPLABV3_MODELS[variant]
+    print()
+    print("=" * 50)
+    print(f"DeepLabV3 ({info['description']}) のダウンロードを開始")
+    print("=" * 50)
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    output_path = os.path.join(OUTPUT_DIR, f"{variant}.mlmodel")
+
+    if os.path.exists(output_path):
+        print(f"既にダウンロード済み: {output_path}")
+        return True
+
+    url = info["url"]
+    print(f"ダウンロード中: {url}")
+
+    try:
+        urllib.request.urlretrieve(url, output_path)
+        print(f"モデルを保存しました: {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error: ダウンロードに失敗しました: {e}")
+        return False
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="CoreMLモデル変換スクリプト"
@@ -229,6 +277,17 @@ def parse_args():
         help="全YOLOバリアントを変換",
     )
     parser.add_argument(
+        "--deeplabv3-variant",
+        choices=list(DEEPLABV3_MODELS.keys()),
+        default="DeepLabV3FP16",
+        help="ダウンロードするDeepLabV3バリアント (default: DeepLabV3FP16)",
+    )
+    parser.add_argument(
+        "--all-deeplabv3",
+        action="store_true",
+        help="全DeepLabV3バリアントをダウンロード",
+    )
+    parser.add_argument(
         "--skip-depth",
         action="store_true",
         help="深度推定モデルの変換をスキップ",
@@ -237,6 +296,11 @@ def parse_args():
         "--skip-yolo",
         action="store_true",
         help="YOLOモデルの変換をスキップ",
+    )
+    parser.add_argument(
+        "--skip-segmentation",
+        action="store_true",
+        help="セグメンテーションモデルのダウンロードをスキップ",
     )
     return parser.parse_args()
 
@@ -266,6 +330,15 @@ def main():
     # Depth conversion
     if not args.skip_depth:
         results["Depth Anything V2"] = convert_depth_anything()
+
+    # DeepLabV3 download
+    if not args.skip_segmentation:
+        if args.all_deeplabv3:
+            for variant in DEEPLABV3_MODELS:
+                results[f"DeepLabV3 ({variant})"] = download_deeplabv3(variant)
+        else:
+            variant = args.deeplabv3_variant
+            results[f"DeepLabV3 ({variant})"] = download_deeplabv3(variant)
 
     print()
     print("=" * 50)

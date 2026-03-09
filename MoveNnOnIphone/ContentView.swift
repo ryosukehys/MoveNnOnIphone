@@ -18,6 +18,11 @@ struct ContentView: View {
                     Label("深度推定", systemImage: "cube.fill")
                 }
 
+            SegmentationView()
+                .tabItem {
+                    Label("セグメント", systemImage: "square.on.square.dashed")
+                }
+
             SettingsView()
                 .tabItem {
                     Label("設定", systemImage: "gear")
