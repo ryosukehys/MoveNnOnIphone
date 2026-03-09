@@ -56,11 +56,10 @@ final class SegmentationEstimator: ObservableObject {
     }
 
     private func loadModel() {
-        guard let modelURL = Bundle.main.url(
-            forResource: currentVariant.modelFileName,
-            withExtension: "mlmodelc"
+        guard let modelURL = ModelDownloadManager.shared.modelURL(
+            fileName: currentVariant.modelFileName
         ) else {
-            print("[SegmentationEstimator] \(currentVariant.modelFileName).mlmodelc not found in bundle")
+            print("[SegmentationEstimator] \(currentVariant.modelFileName).mlmodelc not found")
             return
         }
 

@@ -31,8 +31,10 @@ final class YOLODetector: ObservableObject {
     }
 
     private func loadModel() {
-        guard let modelURL = Bundle.main.url(forResource: currentVariant.modelFileName, withExtension: "mlmodelc") else {
-            print("[YOLODetector] \(currentVariant.modelFileName).mlmodelc not found in bundle")
+        guard let modelURL = ModelDownloadManager.shared.modelURL(
+            fileName: currentVariant.modelFileName
+        ) else {
+            print("[YOLODetector] \(currentVariant.modelFileName).mlmodelc not found")
             return
         }
 

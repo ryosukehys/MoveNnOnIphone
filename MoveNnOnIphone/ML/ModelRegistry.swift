@@ -31,7 +31,11 @@ enum YOLOVariant: String, CaseIterable, Identifiable, Codable {
     }
 
     var isAvailable: Bool {
-        Bundle.main.url(forResource: modelFileName, withExtension: "mlmodelc") != nil
+        ModelDownloadManager.shared.modelURL(fileName: modelFileName) != nil
+    }
+
+    var downloadState: ModelDownloadState {
+        ModelDownloadManager.shared.state(for: modelFileName)
     }
 }
 
@@ -63,7 +67,11 @@ enum DepthModelVariant: String, CaseIterable, Identifiable, Codable {
     }
 
     var isAvailable: Bool {
-        Bundle.main.url(forResource: modelFileName, withExtension: "mlmodelc") != nil
+        ModelDownloadManager.shared.modelURL(fileName: modelFileName) != nil
+    }
+
+    var downloadState: ModelDownloadState {
+        ModelDownloadManager.shared.state(for: modelFileName)
     }
 }
 
@@ -95,7 +103,11 @@ enum SegmentationModelVariant: String, CaseIterable, Identifiable, Codable {
     }
 
     var isAvailable: Bool {
-        Bundle.main.url(forResource: modelFileName, withExtension: "mlmodelc") != nil
+        ModelDownloadManager.shared.modelURL(fileName: modelFileName) != nil
+    }
+
+    var downloadState: ModelDownloadState {
+        ModelDownloadManager.shared.state(for: modelFileName)
     }
 }
 

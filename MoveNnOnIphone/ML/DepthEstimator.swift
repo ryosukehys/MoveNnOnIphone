@@ -23,11 +23,10 @@ final class DepthEstimator: ObservableObject {
     }
 
     private func loadModel() {
-        guard let modelURL = Bundle.main.url(
-            forResource: currentVariant.modelFileName,
-            withExtension: "mlmodelc"
+        guard let modelURL = ModelDownloadManager.shared.modelURL(
+            fileName: currentVariant.modelFileName
         ) else {
-            print("[DepthEstimator] \(currentVariant.modelFileName).mlmodelc not found in bundle")
+            print("[DepthEstimator] \(currentVariant.modelFileName).mlmodelc not found")
             return
         }
 
