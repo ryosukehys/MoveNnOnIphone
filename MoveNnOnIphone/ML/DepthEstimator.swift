@@ -5,17 +5,29 @@ import UIKit
 final class DepthEstimator: ObservableObject {
     private var model: VNCoreMLModel?
     @Published var isModelLoaded = false
+    private(set) var currentVariant: DepthModelVariant
 
-    init() {
+    init(variant: DepthModelVariant = .smallF16) {
+        currentVariant = variant
+        loadModel()
+    }
+
+    func switchModel(to variant: DepthModelVariant) {
+        guard variant != currentVariant else { return }
+        currentVariant = variant
+        model = nil
+        DispatchQueue.main.async {
+            self.isModelLoaded = false
+        }
         loadModel()
     }
 
     private func loadModel() {
         guard let modelURL = Bundle.main.url(
-            forResource: "DepthAnythingV2SmallF16",
+            forResource: currentVariant.modelFileName,
             withExtension: "mlmodelc"
         ) else {
-            print("[DepthEstimator] DepthAnythingV2SmallF16.mlmodelc not found in bundle")
+            print("[DepthEstimator] \(currentVariant.modelFileName).mlmodelc not found in bundle")
             return
         }
 

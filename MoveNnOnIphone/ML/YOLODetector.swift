@@ -13,14 +13,26 @@ struct DetectedObject: Identifiable {
 final class YOLODetector: ObservableObject {
     private var model: VNCoreMLModel?
     @Published var isModelLoaded = false
+    private(set) var currentVariant: YOLOVariant
 
-    init() {
+    init(variant: YOLOVariant = .nano) {
+        currentVariant = variant
+        loadModel()
+    }
+
+    func switchModel(to variant: YOLOVariant) {
+        guard variant != currentVariant else { return }
+        currentVariant = variant
+        model = nil
+        DispatchQueue.main.async {
+            self.isModelLoaded = false
+        }
         loadModel()
     }
 
     private func loadModel() {
-        guard let modelURL = Bundle.main.url(forResource: "yolov8n", withExtension: "mlmodelc") else {
-            print("[YOLODetector] yolov8n.mlmodelc not found in bundle")
+        guard let modelURL = Bundle.main.url(forResource: currentVariant.modelFileName, withExtension: "mlmodelc") else {
+            print("[YOLODetector] \(currentVariant.modelFileName).mlmodelc not found in bundle")
             return
         }
 

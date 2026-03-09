@@ -2,7 +2,7 @@ import SwiftUI
 
 struct RealTimeDetectionView: View {
     @StateObject private var cameraManager = CameraManager()
-    @StateObject private var detector = YOLODetector()
+    @StateObject private var detector = YOLODetector(variant: AppSettings.shared.yoloVariant)
     @ObservedObject private var settings = AppSettings.shared
 
     @State private var detections: [DetectedObject] = []
@@ -44,6 +44,9 @@ struct RealTimeDetectionView: View {
         }
         .onDisappear {
             cameraManager.stop()
+        }
+        .onChange(of: settings.selectedYOLOVariant) { _ in
+            detector.switchModel(to: settings.yoloVariant)
         }
     }
 

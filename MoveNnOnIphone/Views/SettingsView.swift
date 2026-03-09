@@ -2,8 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
-    @StateObject private var detector = YOLODetector()
-    @StateObject private var estimator = DepthEstimator()
+    @StateObject private var detector = YOLODetector(variant: AppSettings.shared.yoloVariant)
+    @StateObject private var estimator = DepthEstimator(variant: AppSettings.shared.depthVariant)
 
     var body: some View {
         NavigationView {
@@ -37,16 +37,76 @@ struct SettingsView: View {
                     Text("YOLO 設定")
                 }
 
+                // YOLO Model Selection
+                Section {
+                    ForEach(YOLOVariant.allCases) { variant in
+                        Button {
+                            settings.selectedYOLOVariant = variant.rawValue
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(variant.displayName)
+                                        .foregroundColor(.primary)
+                                    Text(variant.description)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if settings.selectedYOLOVariant == variant.rawValue {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.accentColor)
+                                }
+                                modelAvailabilityBadge(
+                                    isAvailable: variant.isAvailable
+                                )
+                            }
+                        }
+                    }
+                } header: {
+                    Text("YOLO モデル選択")
+                } footer: {
+                    Text("使用するモデルは事前に変換が必要です。未変換のモデルは赤で表示されます。")
+                }
+
+                // Depth Model Selection
+                Section {
+                    ForEach(DepthModelVariant.allCases) { variant in
+                        Button {
+                            settings.selectedDepthModel = variant.rawValue
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(variant.displayName)
+                                        .foregroundColor(.primary)
+                                    Text(variant.description)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if settings.selectedDepthModel == variant.rawValue {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.accentColor)
+                                }
+                                modelAvailabilityBadge(
+                                    isAvailable: variant.isAvailable
+                                )
+                            }
+                        }
+                    }
+                } header: {
+                    Text("深度推定モデル選択")
+                }
+
                 // Model Status
                 Section {
                     HStack {
-                        Label("YOLOv8n", systemImage: "cpu")
+                        Label(settings.yoloVariant.displayName, systemImage: "cpu")
                         Spacer()
                         modelStatusBadge(isLoaded: detector.isModelLoaded)
                     }
 
                     HStack {
-                        Label("Depth Anything V2", systemImage: "cpu")
+                        Label(settings.depthVariant.displayName, systemImage: "cpu")
                         Spacer()
                         modelStatusBadge(isLoaded: estimator.isModelLoaded)
                     }
@@ -72,13 +132,13 @@ struct SettingsView: View {
                     HStack {
                         Text("バージョン")
                         Spacer()
-                        Text("1.0.0")
+                        Text("1.1.0")
                             .foregroundColor(.secondary)
                     }
                     HStack {
                         Text("対応モデル")
                         Spacer()
-                        Text("YOLOv8, Depth Anything V2")
+                        Text("YOLOv8 (n/s/m/x), Depth Anything V2")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -87,10 +147,16 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("設定")
+            .onChange(of: settings.selectedYOLOVariant) { _ in
+                detector.switchModel(to: settings.yoloVariant)
+            }
+            .onChange(of: settings.selectedDepthModel) { _ in
+                estimator.switchModel(to: settings.depthVariant)
+            }
         }
     }
 
-    // MARK: - Model Status Badge
+    // MARK: - Badges
 
     private func modelStatusBadge(isLoaded: Bool) -> some View {
         HStack(spacing: 4) {
@@ -101,6 +167,12 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundColor(isLoaded ? .green : .red)
         }
+    }
+
+    private func modelAvailabilityBadge(isAvailable: Bool) -> some View {
+        Circle()
+            .fill(isAvailable ? .green : .red.opacity(0.6))
+            .frame(width: 8, height: 8)
     }
 
     // MARK: - Usage Guide
@@ -138,7 +210,7 @@ struct SettingsView: View {
                     .font(.headline)
                     .padding(.top)
 
-                Text("1. YOLOv8n CoreMLモデル (yolov8n.mlmodel) を取得\n2. Depth Anything V2 CoreMLモデル (DepthAnythingV2SmallF16.mlmodel) を取得\n3. 各モデルファイルをXcodeプロジェクトにドラッグ＆ドロップ\n4. ビルドして実行")
+                Text("1. bash scripts/setup_and_convert.sh を実行\n2. 追加のYOLOバリアントが必要な場合:\n   python scripts/convert_models.py --yolo-variant yolov8s\n3. XcodeGenでプロジェクト生成: xcodegen generate\n4. ビルドして実行")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

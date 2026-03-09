@@ -10,9 +10,13 @@ YOLOv8 と Depth Anything V2 を CoreML 形式に変換します。
 使い方:
     bash scripts/setup_and_convert.sh          # 推奨（venv自動作成）
     bash scripts/setup_and_convert.sh /path/to/venv  # 既存venv指定
-    python convert_models.py                   # 手動実行
+    python convert_models.py                   # 手動実行（デフォルト: yolov8n + depth）
+    python convert_models.py --yolo-variant yolov8s  # 特定のYOLOバリアント
+    python convert_models.py --all-yolo        # 全YOLOバリアントを変換
+    python convert_models.py --skip-depth      # 深度モデルをスキップ
 """
 
+import argparse
 import os
 import sys
 import importlib.metadata
@@ -25,6 +29,14 @@ REQUIRED_PACKAGES = {
     "coremltools": "7.0",
     "ultralytics": "8.0.0",
     "transformers": "4.35.0",
+}
+
+# 利用可能なYOLOバリアント
+YOLO_VARIANTS = {
+    "yolov8n": {"pt": "yolov8n.pt", "description": "Nano - 最速・軽量"},
+    "yolov8s": {"pt": "yolov8s.pt", "description": "Small - バランス型"},
+    "yolov8m": {"pt": "yolov8m.pt", "description": "Medium - 高精度"},
+    "yolov8x": {"pt": "yolov8x.pt", "description": "Extra Large - 最高精度"},
 }
 
 
@@ -82,10 +94,16 @@ def check_dependencies():
     print()
 
 
-def convert_yolov8():
-    """YOLOv8n を CoreML 形式に変換"""
+def convert_yolov8(variant="yolov8n"):
+    """YOLOv8 を CoreML 形式に変換"""
+    if variant not in YOLO_VARIANTS:
+        print(f"Error: 不明なバリアント '{variant}'")
+        print(f"利用可能: {', '.join(YOLO_VARIANTS.keys())}")
+        return False
+
+    info = YOLO_VARIANTS[variant]
     print("=" * 50)
-    print("YOLOv8n の CoreML 変換を開始")
+    print(f"{variant} ({info['description']}) の CoreML 変換を開始")
     print("=" * 50)
 
     try:
@@ -95,7 +113,7 @@ def convert_yolov8():
         print("  pip install ultralytics")
         return False
 
-    model = YOLO("yolov8n.pt")
+    model = YOLO(info["pt"])
     model.export(
         format="coreml",
         nms=True,
@@ -103,13 +121,15 @@ def convert_yolov8():
     )
 
     # Move the exported model
-    src = "yolov8n.mlpackage"
-    dst = os.path.join(OUTPUT_DIR, "yolov8n.mlpackage")
+    src = f"{variant}.mlpackage"
+    dst = os.path.join(OUTPUT_DIR, f"{variant}.mlpackage")
     if os.path.exists(src):
         os.makedirs(OUTPUT_DIR, exist_ok=True)
+        if os.path.exists(dst):
+            import shutil
+            shutil.rmtree(dst)
         os.rename(src, dst)
         print(f"モデルを保存しました: {dst}")
-        print("Xcodeプロジェクトに yolov8n.mlpackage を追加してください")
         return True
     else:
         print("Warning: エクスポートされたモデルが見つかりません")
@@ -190,11 +210,40 @@ def convert_depth_anything():
     output_path = os.path.join(OUTPUT_DIR, "DepthAnythingV2SmallF16.mlpackage")
     mlmodel.save(output_path)
     print(f"モデルを保存しました: {output_path}")
-    print("Xcodeプロジェクトに DepthAnythingV2SmallF16.mlpackage を追加してください")
     return True
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="CoreMLモデル変換スクリプト"
+    )
+    parser.add_argument(
+        "--yolo-variant",
+        choices=list(YOLO_VARIANTS.keys()),
+        default="yolov8n",
+        help="変換するYOLOバリアント (default: yolov8n)",
+    )
+    parser.add_argument(
+        "--all-yolo",
+        action="store_true",
+        help="全YOLOバリアントを変換",
+    )
+    parser.add_argument(
+        "--skip-depth",
+        action="store_true",
+        help="深度推定モデルの変換をスキップ",
+    )
+    parser.add_argument(
+        "--skip-yolo",
+        action="store_true",
+        help="YOLOモデルの変換をスキップ",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     print("CoreML モデル変換スクリプト")
     print()
 
@@ -202,23 +251,36 @@ def main():
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    yolo_ok = convert_yolov8()
-    depth_ok = convert_depth_anything()
+    results = {}
+
+    # YOLO conversion
+    if not args.skip_yolo:
+        if args.all_yolo:
+            for variant in YOLO_VARIANTS:
+                results[variant] = convert_yolov8(variant)
+                print()
+        else:
+            variant = args.yolo_variant
+            results[variant] = convert_yolov8(variant)
+
+    # Depth conversion
+    if not args.skip_depth:
+        results["Depth Anything V2"] = convert_depth_anything()
 
     print()
     print("=" * 50)
     print("変換結果:")
-    print(f"  YOLOv8n:           {'OK' if yolo_ok else 'FAILED'}")
-    print(f"  Depth Anything V2: {'OK' if depth_ok else 'FAILED'}")
+    for name, ok in results.items():
+        status = "OK" if ok else "FAILED"
+        print(f"  {name:30s} {status}")
     print("=" * 50)
 
-    if yolo_ok or depth_ok:
+    if any(results.values()):
         print()
         print("次のステップ:")
         print(f"1. {OUTPUT_DIR} 内のモデルファイルを確認")
-        print("2. Xcodeでプロジェクトを開く")
-        print("3. モデルファイルをプロジェクトにドラッグ＆ドロップ")
-        print("4. ビルドして実行")
+        print("2. xcodegen generate でプロジェクト生成")
+        print("3. Xcodeでビルドして実行")
 
 
 if __name__ == "__main__":
