@@ -2,9 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
-    @StateObject private var detector = YOLODetector(variant: AppSettings.shared.yoloVariant)
-    @StateObject private var estimator = DepthEstimator(variant: AppSettings.shared.depthVariant)
-    @StateObject private var segEstimator = SegmentationEstimator(variant: AppSettings.shared.segmentationVariant)
+    @State private var showMemoryWarning = false
+    @State private var memoryWarningText = ""
 
     var body: some View {
         NavigationView {
@@ -41,25 +40,18 @@ struct SettingsView: View {
                 // YOLO Model Selection
                 Section {
                     ForEach(YOLOVariant.allCases) { variant in
-                        Button {
-                            settings.selectedYOLOVariant = variant.rawValue
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(variant.displayName)
-                                        .foregroundColor(.primary)
-                                    Text(variant.description)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                Spacer()
-                                if settings.selectedYOLOVariant == variant.rawValue {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
-                                }
-                                modelAvailabilityBadge(
-                                    isAvailable: variant.isAvailable
-                                )
+                        modelSelectionRow(
+                            displayName: variant.displayName,
+                            description: variant.description,
+                            isSelected: settings.selectedYOLOVariant == variant.rawValue,
+                            isAvailable: variant.isAvailable,
+                            canRunOnDevice: variant.canRunOnDevice,
+                            memoryWarning: variant.memoryWarning
+                        ) {
+                            selectModelWithWarning(
+                                warning: variant.memoryWarning
+                            ) {
+                                settings.selectedYOLOVariant = variant.rawValue
                             }
                         }
                     }
@@ -72,25 +64,18 @@ struct SettingsView: View {
                 // Depth Model Selection
                 Section {
                     ForEach(DepthModelVariant.allCases) { variant in
-                        Button {
-                            settings.selectedDepthModel = variant.rawValue
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(variant.displayName)
-                                        .foregroundColor(.primary)
-                                    Text(variant.description)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                Spacer()
-                                if settings.selectedDepthModel == variant.rawValue {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
-                                }
-                                modelAvailabilityBadge(
-                                    isAvailable: variant.isAvailable
-                                )
+                        modelSelectionRow(
+                            displayName: variant.displayName,
+                            description: variant.description,
+                            isSelected: settings.selectedDepthModel == variant.rawValue,
+                            isAvailable: variant.isAvailable,
+                            canRunOnDevice: variant.canRunOnDevice,
+                            memoryWarning: variant.memoryWarning
+                        ) {
+                            selectModelWithWarning(
+                                warning: variant.memoryWarning
+                            ) {
+                                settings.selectedDepthModel = variant.rawValue
                             }
                         }
                     }
@@ -101,25 +86,18 @@ struct SettingsView: View {
                 // Segmentation Model Selection
                 Section {
                     ForEach(SegmentationModelVariant.allCases) { variant in
-                        Button {
-                            settings.selectedSegmentationModel = variant.rawValue
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(variant.displayName)
-                                        .foregroundColor(.primary)
-                                    Text(variant.description)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                Spacer()
-                                if settings.selectedSegmentationModel == variant.rawValue {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
-                                }
-                                modelAvailabilityBadge(
-                                    isAvailable: variant.isAvailable
-                                )
+                        modelSelectionRow(
+                            displayName: variant.displayName,
+                            description: variant.description,
+                            isSelected: settings.selectedSegmentationModel == variant.rawValue,
+                            isAvailable: variant.isAvailable,
+                            canRunOnDevice: variant.canRunOnDevice,
+                            memoryWarning: variant.memoryWarning
+                        ) {
+                            selectModelWithWarning(
+                                warning: variant.memoryWarning
+                            ) {
+                                settings.selectedSegmentationModel = variant.rawValue
                             }
                         }
                     }
@@ -129,29 +107,18 @@ struct SettingsView: View {
                     Text("DeepLabV3 (PASCAL VOC 21クラス) によるセマンティックセグメンテーション")
                 }
 
-                // Model Status
+                // Device Info
                 Section {
                     HStack {
-                        Label(settings.yoloVariant.displayName, systemImage: "cpu")
+                        Text("デバイスメモリ")
                         Spacer()
-                        modelStatusBadge(isLoaded: detector.isModelLoaded)
-                    }
-
-                    HStack {
-                        Label(settings.depthVariant.displayName, systemImage: "cpu")
-                        Spacer()
-                        modelStatusBadge(isLoaded: estimator.isModelLoaded)
-                    }
-
-                    HStack {
-                        Label(settings.segmentationVariant.displayName, systemImage: "cpu")
-                        Spacer()
-                        modelStatusBadge(isLoaded: segEstimator.isModelLoaded)
+                        Text(String(format: "%.1f GB", DeviceCapability.memoryGB))
+                            .foregroundColor(.secondary)
                     }
                 } header: {
-                    Text("モデル状態")
+                    Text("デバイス情報")
                 } footer: {
-                    Text("モデルが「未検出」の場合は、CoreMLモデルファイルをXcodeプロジェクトに追加してください。")
+                    Text("大きなモデルはメモリ不足でクラッシュする場合があります。デバイスのメモリに合ったモデルを選択してください。")
                 }
 
                 // Usage Guide
@@ -170,7 +137,7 @@ struct SettingsView: View {
                     HStack {
                         Text("バージョン")
                         Spacer()
-                        Text("1.2.0")
+                        Text("1.3.0")
                             .foregroundColor(.secondary)
                     }
                     HStack {
@@ -185,30 +152,68 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("設定")
-            .onChange(of: settings.selectedYOLOVariant) { _ in
-                detector.switchModel(to: settings.yoloVariant)
+            .alert("メモリ警告", isPresented: $showMemoryWarning) {
+                Button("それでも使用する", role: .destructive) {}
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text(memoryWarningText)
             }
-            .onChange(of: settings.selectedDepthModel) { _ in
-                estimator.switchModel(to: settings.depthVariant)
+        }
+    }
+
+    // MARK: - Model Selection Row
+
+    private func modelSelectionRow(
+        displayName: String,
+        description: String,
+        isSelected: Bool,
+        isAvailable: Bool,
+        canRunOnDevice: Bool,
+        memoryWarning: String?,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(displayName)
+                            .foregroundColor(.primary)
+                        if !canRunOnDevice {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    Text(description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if let memoryWarning {
+                        Text(memoryWarning)
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                    }
+                }
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .foregroundColor(.accentColor)
+                }
+                modelAvailabilityBadge(isAvailable: isAvailable)
             }
-            .onChange(of: settings.selectedSegmentationModel) { _ in
-                segEstimator.switchModel(to: settings.segmentationVariant)
-            }
+        }
+    }
+
+    private func selectModelWithWarning(warning: String?, action: @escaping () -> Void) {
+        if let warning {
+            memoryWarningText = warning
+            showMemoryWarning = true
+            action()
+        } else {
+            action()
         }
     }
 
     // MARK: - Badges
-
-    private func modelStatusBadge(isLoaded: Bool) -> some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(isLoaded ? .green : .red)
-                .frame(width: 8, height: 8)
-            Text(isLoaded ? "読み込み済み" : "未検出")
-                .font(.caption)
-                .foregroundColor(isLoaded ? .green : .red)
-        }
-    }
 
     private func modelAvailabilityBadge(isAvailable: Bool) -> some View {
         Circle()

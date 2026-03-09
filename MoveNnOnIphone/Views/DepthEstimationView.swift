@@ -21,10 +21,12 @@ struct DepthEstimationView: View {
         }
         .onAppear {
             cameraManager.checkPermission()
+            estimator.prepareIfNeeded()
             cameraManager.start()
         }
         .onDisappear {
             cameraManager.stop()
+            estimator.unloadModel()
         }
         .onChange(of: settings.selectedDepthModel) { _ in
             estimator.switchModel(to: settings.depthVariant)

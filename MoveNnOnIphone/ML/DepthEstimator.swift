@@ -5,11 +5,25 @@ import UIKit
 final class DepthEstimator: ObservableObject {
     private var model: VNCoreMLModel?
     @Published var isModelLoaded = false
+    @Published var isLoading = false
+    @Published var loadError: String?
     private(set) var currentVariant: DepthModelVariant
 
     init(variant: DepthModelVariant = .smallF16) {
         currentVariant = variant
+    }
+
+    func prepareIfNeeded() {
+        guard model == nil, !isLoading else { return }
         loadModel()
+    }
+
+    func unloadModel() {
+        model = nil
+        DispatchQueue.main.async {
+            self.isModelLoaded = false
+        }
+        print("[DepthEstimator] Model unloaded to free memory")
     }
 
     func switchModel(to variant: DepthModelVariant) {
@@ -18,30 +32,48 @@ final class DepthEstimator: ObservableObject {
         model = nil
         DispatchQueue.main.async {
             self.isModelLoaded = false
+            self.loadError = nil
         }
         loadModel()
     }
 
     private func loadModel() {
-        guard let modelURL = Bundle.main.url(
-            forResource: currentVariant.modelFileName,
-            withExtension: "mlmodelc"
+        guard let modelURL = ModelDownloadManager.shared.modelURL(
+            fileName: currentVariant.modelFileName
         ) else {
-            print("[DepthEstimator] \(currentVariant.modelFileName).mlmodelc not found in bundle")
+            print("[DepthEstimator] \(currentVariant.modelFileName).mlmodelc not found")
+            DispatchQueue.main.async {
+                self.loadError = "モデルファイルが見つかりません"
+            }
             return
         }
 
-        do {
-            let config = MLModelConfiguration()
-            config.computeUnits = .cpuAndNeuralEngine
-            let mlModel = try MLModel(contentsOf: modelURL, configuration: config)
-            model = try VNCoreMLModel(for: mlModel)
-            DispatchQueue.main.async {
-                self.isModelLoaded = true
+        DispatchQueue.main.async {
+            self.isLoading = true
+            self.loadError = nil
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+
+            do {
+                let config = MLModelConfiguration()
+                config.computeUnits = .cpuAndNeuralEngine
+                let mlModel = try MLModel(contentsOf: modelURL, configuration: config)
+                let vncoreModel = try VNCoreMLModel(for: mlModel)
+                DispatchQueue.main.async {
+                    self.model = vncoreModel
+                    self.isModelLoaded = true
+                    self.isLoading = false
+                }
+                print("[DepthEstimator] Model loaded successfully: \(self.currentVariant.displayName)")
+            } catch {
+                print("[DepthEstimator] Failed to load model: \(error)")
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.loadError = "モデルの読み込みに失敗: \(error.localizedDescription)"
+                }
             }
-            print("[DepthEstimator] Model loaded successfully")
-        } catch {
-            print("[DepthEstimator] Failed to load model: \(error)")
         }
     }
 

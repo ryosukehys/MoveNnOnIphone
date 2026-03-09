@@ -20,10 +20,12 @@ struct PhotoDetectionView: View {
         }
         .onAppear {
             cameraManager.checkPermission()
+            detector.prepareIfNeeded()
             cameraManager.start()
         }
         .onDisappear {
             cameraManager.stop()
+            detector.unloadModel()
         }
         .onChange(of: settings.selectedYOLOVariant) { _ in
             detector.switchModel(to: settings.yoloVariant)
