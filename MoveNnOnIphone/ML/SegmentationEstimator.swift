@@ -213,7 +213,7 @@ final class SegmentationEstimator: ObservableObject {
         // Collect detected classes
         var detectedClassIndices = Set<Int>()
 
-        // Generate RGBA pixels
+        // Generate RGBA pixels (premultiplied alpha)
         var pixels = [UInt8](repeating: 0, count: count * 4)
         for i in 0..<count {
             let classIdx = min(classMap[i], classColors.count - 1)
@@ -222,10 +222,21 @@ final class SegmentationEstimator: ObservableObject {
             }
             let (r, g, b) = classColors[max(0, classIdx)]
             let idx = i * 4
-            pixels[idx] = r
-            pixels[idx + 1] = g
-            pixels[idx + 2] = b
-            pixels[idx + 3] = classIdx == 0 ? 0 : 200 // semi-transparent for overlay
+            if classIdx == 0 {
+                // Background: fully transparent
+                pixels[idx] = 0
+                pixels[idx + 1] = 0
+                pixels[idx + 2] = 0
+                pixels[idx + 3] = 0
+            } else {
+                // Premultiply RGB by alpha (200/255)
+                let alpha: UInt8 = 200
+                let f = Float(alpha) / 255.0
+                pixels[idx] = UInt8(Float(r) * f)
+                pixels[idx + 1] = UInt8(Float(g) * f)
+                pixels[idx + 2] = UInt8(Float(b) * f)
+                pixels[idx + 3] = alpha
+            }
         }
 
         let colorSpace = CGColorSpaceCreateDeviceRGB()

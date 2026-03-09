@@ -23,11 +23,11 @@ struct DepthColorBar: View {
                 .frame(height: 12)
 
             HStack {
-                Text("近い")
+                Text("遠い")
                     .font(.caption2)
                     .fontWeight(.medium)
                 Spacer()
-                Text("遠い")
+                Text("近い")
                     .font(.caption2)
                     .fontWeight(.medium)
             }
